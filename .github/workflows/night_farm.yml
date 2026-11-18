@@ -1,0 +1,37 @@
+name: Night TikTok Farm
+
+on:
+  schedule:
+    # Запуск каждый день в 03:00 и 06:00 утра по Минску (00:00 и 03:00 UTC)
+    - cron: '0 0,3 * * *'
+  # Кнопка для ручного запуска и проверки в любое время
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Загружаем код
+        uses: actions/checkout@v4
+
+      - name: Устанавливаем Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Устанавливаем библиотеки для ИИ и монтажа
+        run: |
+          pip install google-genai edge-tts requests moviepy==1.0.3
+
+      - name: Генерируем ролик
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python bot.py
+
+      - name: Сохраняем готовое видео
+        uses: actions/upload-artifact@v4
+        with:
+          name: ready-tiktok-video
+          path: |
+            output.mp4
+            title.txt
