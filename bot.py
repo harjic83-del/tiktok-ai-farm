@@ -8,6 +8,16 @@ from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
 
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
+# Автоматически ищем рабочую модель Flash на вашем аккаунте
+available_models = [
+    m.name.replace("models/", "")
+    for m in client.models.list()
+    if "flash" in m.name.lower() and "lite" not in m.name.lower() and "image" not in m.name.lower()
+]
+# Сортируем от самой новой к старой
+available_models.sort(reverse=True)
+print("Найденные модели:", available_models)
+
 prompt = """
 Придумай 1 короткий, шокирующий или малоизвестный факт для вирусного ролика в TikTok (длительностью 25-35 секунд) на русском языке.
 Разбей рассказ ровно на 4 короткие сцены.
@@ -23,10 +33,20 @@ prompt = """
 }
 """
 
-response = client.models.generate_content(
-    model='gemini-3.0-flash',
-    contents=prompt,
-)
+response = None
+for model_name in available_models:
+    try:
+        print(f"Пробуем модель: {model_name}")
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+        )
+        break
+    except Exception as e:
+        print(f"Модель {model_name} не подошла: {e}")
+
+if not response:
+    raise Exception("Не удалось получить ответ ни от одной модели!")
 
 raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
 data = json.loads(raw_text)
@@ -71,4 +91,5 @@ with open("title.txt", "w", encoding="utf-8") as f:
     f.write(data["title"])
 
 print("Видео успешно собрано!")
+
 
