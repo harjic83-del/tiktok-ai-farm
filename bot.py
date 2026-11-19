@@ -45,29 +45,24 @@ prompt = """
 }
 """
 
-# Список моделей с защитой от перегрузки серверов Google (503)
-models_to_try = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-flash", "gemini-3-flash-preview"]
+# Настойчиво стучимся в gemini-3.8-flash (12 попыток по 15 сек = до 3 минут ожидания очереди)
 response = None
+for attempt in range(1, 13):
+    try:
+        print(f"Попытка {attempt}/12: запрашиваем сценарий у gemini-3.8-flash...")
+        response = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=prompt,
+        )
+        if response and response.text:
+            print("Сценарий успешно получен!")
+            break
+    except Exception as e:
+        print(f"Сервер Google занят, ждем 15 секунд... ({e})")
+        time.sleep(15)
 
-for attempt in range(3):
-    for model_name in models_to_try:
-        try:
-            print(f"Попытка {attempt+1}: запрашиваем сценарий у {model_name}...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-            )
-            if response and response.text:
-                break
-        except Exception as e:
-            print(f"Модель {model_name} занята: {e}")
-            time.sleep(3)
-    if response and response.text:
-        break
-    time.sleep(5)
-
-if not response:
-    raise Exception("Все серверы Google временно перегружены, попробуйте через пару минут.")
+if not response or not response.text:
+    raise Exception("Сервер Google перегружен более 3 минут подряд.")
 
 raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
 data = json.loads(raw_text)
@@ -87,7 +82,7 @@ def add_word_subtitle(pil_img, word):
         return pil_img
 
     bbox = draw.textbbox((0, 0), clean_word, font=font)
-    w = bbox - bbox
+    w = bbox[2] - bbox[0]
     x_text = (1080 - w) / 2
     y_text = 1480
     
@@ -158,3 +153,4 @@ with open("title.txt", "w", encoding="utf-8") as f:
     f.write(data["title"])
 
 print("Минутный мультфильм про Франклина Сейнта готов!")
+
