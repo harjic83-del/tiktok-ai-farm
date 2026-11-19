@@ -45,17 +45,35 @@ prompt = """
 }
 """
 
-response = client.models.generate_content(
-    model="gemini-3.8-flash",
-    contents=prompt,
-)
+# Список моделей с защитой от перегрузки серверов Google (503)
+models_to_try = ["gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-2.5-flash", "gemini-3-flash-preview"]
+response = None
+
+for attempt in range(3):
+    for model_name in models_to_try:
+        try:
+            print(f"Попытка {attempt+1}: запрашиваем сценарий у {model_name}...")
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
+            if response and response.text:
+                break
+        except Exception as e:
+            print(f"Модель {model_name} занята: {e}")
+            time.sleep(3)
+    if response and response.text:
+        break
+    time.sleep(5)
+
+if not response:
+    raise Exception("Все серверы Google временно перегружены, попробуйте через пару минут.")
 
 raw_text = response.text.strip().removeprefix("```json").removesuffix("```").strip()
 data = json.loads(raw_text)
 print("Заголовок:", data["title"])
 
 async def make_audio(text, filename):
-    # Глубокий, спокойный и уверенный голос рассказчика
     communicate = edge_tts.Communicate(text, "ru-RU-DmitryNeural", rate="+2%", pitch="-8Hz")
     await communicate.save(filename)
 
@@ -140,4 +158,3 @@ with open("title.txt", "w", encoding="utf-8") as f:
     f.write(data["title"])
 
 print("Минутный мультфильм про Франклина Сейнта готов!")
-
