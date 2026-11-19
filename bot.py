@@ -45,7 +45,6 @@ prompt = """
 }
 """
 
-# Настойчиво стучимся в gemini-3.8-flash (12 попыток по 15 сек = до 3 минут ожидания очереди)
 response = None
 for attempt in range(1, 13):
     try:
@@ -68,9 +67,20 @@ raw_text = response.text.strip().removeprefix("```json").removesuffix("```").str
 data = json.loads(raw_text)
 print("Заголовок:", data["title"])
 
-async def make_audio(text, filename):
-    communicate = edge_tts.Communicate(text, "ru-RU-DmitryNeural", rate="+2%", pitch="-8Hz")
+async def make_audio_async(text, filename):
+    communicate = edge_tts.Communicate(text, "ru-RU-DmitryNeural", rate="+2%")
     await communicate.save(filename)
+
+def generate_voice(text, filename):
+    for attempt in range(3):
+        try:
+            asyncio.run(make_audio_async(text, filename))
+            if os.path.exists(filename) and os.path.getsize(filename) > 500:
+                return
+        except Exception as e:
+            print(f"Повтор озвучки ({attempt+1}/3): {e}")
+            time.sleep(2)
+    raise Exception("Не удалось озвучить текст после 3 попыток.")
 
 def add_word_subtitle(pil_img, word):
     draw = ImageDraw.Draw(pil_img)
@@ -123,7 +133,7 @@ for i, scene in enumerate(data["scenes"]):
     with open(img_path, "wb") as f:
         f.write(img_data)
         
-    asyncio.run(make_audio(scene["text"], aud_path))
+    generate_voice(scene["text"], aud_path)
     audio_clip = AudioFileClip(aud_path)
     duration = audio_clip.duration
     words = scene["text"].split()
@@ -153,4 +163,3 @@ with open("title.txt", "w", encoding="utf-8") as f:
     f.write(data["title"])
 
 print("Минутный мультфильм про Франклина Сейнта готов!")
-
